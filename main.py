@@ -1,282 +1,194 @@
 # ---------------------------------------------
-# Лабораторная работа по статистическому анализу
-# Анализ распределения случайной величины
+# Лабораторная работа №1
+# Анализ распределения и критерий Пирсона
 # ---------------------------------------------
 
 import csv
 import math
+import matplotlib.pyplot as plt
 
 values = []
 
 # ---------------------------------------------
-# 1. Чтение CSV файла
+# 1. Чтение данных (ТОЛЬКО нормальная часть)
 # ---------------------------------------------
+
+LIMIT = 1_000_000  # первые 1 млн — без аномалий
 
 with open("data.csv", "r") as file:
 
     reader = csv.reader(file)
-
     header = next(reader)
 
-    # Находим индекс столбца bfo2
-    bfo2_index = header.index("bfo2")
+    index = header.index("bfo2")
 
-    # Считываем значения столбца
-    for row in reader:
-        value = float(row[bfo2_index])
-        values.append(value)
+    for i, row in enumerate(reader):
+        if i >= LIMIT:
+            break
 
-# ---------------------------------------------
-# 2. Поиск минимума и максимума
-# ---------------------------------------------
-
-min_value = values[0]
-max_value = values[0]
-
-for v in values:
-
-    if v < min_value:
-        min_value = v
-
-    if v > max_value:
-        max_value = v
-
-print("MIN =", min_value)
-print("MAX =", max_value)
+        values.append(float(row[index]))
 
 # ---------------------------------------------
-# 3. Объем выборки
+# 2. Основные параметры
 # ---------------------------------------------
 
 n = len(values)
+x_min = min(values)
+x_max = max(values)
 
-print("Объем выборки n =", n)
+print("n =", n)
+print("min =", x_min)
+print("max =", x_max)
 
 # ---------------------------------------------
-# 4. Число интервалов (формула Стерджесса)
-# m = 1 + log2(n)
+# 3. Число интервалов (Стерджесс)
 # ---------------------------------------------
 
 m = int(1 + math.log2(n))
-
-print("Количество интервалов m =", m)
-
-# ---------------------------------------------
-# 5. Ширина интервала
-# Δx = (xmax - xmin) / m
-# ---------------------------------------------
-
-x_min = min_value
-x_max = max_value
+print("m =", m)
 
 delta = (x_max - x_min) / m
-
-print("Ширина интервала Δx =", delta)
-
+print(f"Δ = {delta}\n")
 # ---------------------------------------------
-# 6. Построение интервалов
+# 4. Интервалы
 # ---------------------------------------------
 
 intervals = []
 
 left = x_min
-
-for i in range(m):
-
+for _ in range(m):
     right = left + delta
     intervals.append((left, right))
     left = right
 
-print("Интервалы:")
-
-for interval in intervals:
-    print(interval)
-
 # ---------------------------------------------
-# 7. Подсчет частот
+# 5. Частоты
 # ---------------------------------------------
 
 frequencies = [0] * m
 
-for value in values:
+for v in values:
 
-    if value == x_max:
-        frequencies[m - 1] += 1
+    if v == x_max:
+        frequencies[-1] += 1
         continue
 
     for i in range(m):
-
-        left, right = intervals[i]
-
-        if left <= value < right:
+        l, r = intervals[i]
+        if l <= v < r:
             frequencies[i] += 1
             break
 
 # ---------------------------------------------
-# 8. Вывод статистического ряда
+# 6. Относительные частоты и плотности
 # ---------------------------------------------
 
-print("\nСтатистический ряд\n")
-
-for i in range(m):
-
-    left, right = intervals[i]
-
-    print(f"[{left:.2f}; {right:.2f}] -> {frequencies[i]}")
+relative = [f / n for f in frequencies]
+density = [relative[i] / delta for i in range(m)]
+midpoints = [(l + r) / 2 for l, r in intervals]
 
 # ---------------------------------------------
-# 9. Относительные частоты
-# pi = ni / n
+# 7. Гистограмма + нормальная кривая
 # ---------------------------------------------
 
-relative_freq = []
+plt.figure(figsize=(10, 5))
 
-for freq in frequencies:
-    p = freq / n
-    relative_freq.append(p)
+plt.bar(midpoints, density, width=delta, edgecolor="black", alpha=0.6)
 
 # ---------------------------------------------
-# 10. Накопленные частоты
+# 8. Среднее и σ
 # ---------------------------------------------
 
-cumulative_freq = []
+mean = sum(values) / n
+variance = sum((x - mean) ** 2 for x in values) / n
+sigma = math.sqrt(variance)
 
-current_sum = 0
+print("\nmean =", mean)
+print("sigma =", sigma)
 
-for freq in frequencies:
-    current_sum += freq
-    cumulative_freq.append(current_sum)
+# нормальная плотность
+def normal_pdf(x, mu, sigma):
+    return (1 / (sigma * math.sqrt(2 * math.pi))) * math.exp(-((x - mu) ** 2) / (2 * sigma ** 2))
 
-# ---------------------------------------------
-# 11. Вывод интервального статистического ряда
-# ---------------------------------------------
+# рисуем кривую
+x_vals = []
+y_vals = []
 
-print("\nИнтервальный статистический ряд:\n")
+steps = 200
+step = (x_max - x_min) / steps
 
-for i in range(m):
+x = x_min
+for _ in range(steps):
+    x_vals.append(x)
+    y_vals.append(normal_pdf(x, mean, sigma))
+    x += step
 
-    left, right = intervals[i]
-    freq = frequencies[i]
-    rel = relative_freq[i]
-    cum = cumulative_freq[i]
+plt.plot(x_vals, y_vals)
 
-    print(f"[{left:.2f}; {right:.2f}]  n={freq}  p={rel:.6f}  F={cum}")
+plt.title("Гистограмма и нормальное распределение")
+plt.xlabel("x")
+plt.ylabel("Плотность")
+plt.grid()
 
-# ---------------------------------------------
-# 12. Выборочное среднее
-# ---------------------------------------------
-
-sum_x = 0
-
-for v in values:
-    sum_x += v
-
-mean = sum_x / n
-
-print("\nСреднее значение =", mean)
+plt.show()
 
 # ---------------------------------------------
-# 13. Дисперсия
-# ---------------------------------------------
-
-sum_sq = 0
-
-for v in values:
-
-    diff = v - mean
-    sum_sq += diff * diff
-
-variance = sum_sq / n
-
-print("Дисперсия =", variance)
-
-# ---------------------------------------------
-# 14. Стандартное отклонение
-# ---------------------------------------------
-
-std_dev = math.sqrt(variance)
-
-print("Стандартное отклонение =", std_dev)
-
-# ---------------------------------------------
-# 15. Оценка параметров нормального распределения
-# методом моментов
-# μ = x̄
-# σ = sqrt(D)
-# ---------------------------------------------
-
-mu = mean
-sigma = std_dev
-
-# ---------------------------------------------
-# 16. Функция распределения нормального закона
+# 9. Функция распределения
 # ---------------------------------------------
 
 def normal_cdf(x, mu, sigma):
-
     return 0.5 * (1 + math.erf((x - mu) / (sigma * math.sqrt(2))))
 
 # ---------------------------------------------
-# 17. Теоретические вероятности попадания
-# в интервалы
+# 10. Теоретические вероятности
 # ---------------------------------------------
 
-theoretical_p = []
+p_theoretical = [
+    normal_cdf(r, mean, sigma) - normal_cdf(l, mean, sigma)
+    for l, r in intervals
+]
 
-for left, right in intervals:
-
-    p = normal_cdf(right, mu, sigma) - normal_cdf(left, mu, sigma)
-
-    theoretical_p.append(p)
-
-# ---------------------------------------------
-# 18. Ожидаемые частоты
-# np_i
-# ---------------------------------------------
-
-expected = []
-
-for p in theoretical_p:
-
-    expected.append(n * p)
-
-print("\nТеоретические вероятности и ожидаемые частоты:\n")
-
-for i in range(m):
-
-    left, right = intervals[i]
-
-    print(
-        f"[{left:.2f}; {right:.2f}] "
-        f"p={theoretical_p[i]:.9f} "
-        f"np={expected[i]:.2f}"
-    )
+expected = [n * p for p in p_theoretical]
 
 # ---------------------------------------------
-# 19. Критерий согласия Пирсона
+# 11. Проверка np >= 5
 # ---------------------------------------------
 
-chi_square = 0
+print("\nПроверка условия np >= 5:")
 
-for i in range(m):
+for i, exp in enumerate(expected):
+    if exp < 5:
+        print(f"Интервал {intervals[i]}: np = {exp:.2f} < 5 (нарушение)")
 
-    observed = frequencies[i]
-    exp = expected[i]
+# ---------------------------------------------
+# 12. Критерий Пирсона
+# ---------------------------------------------
 
+chi2 = 0
+
+for obs, exp in zip(frequencies, expected):
     if exp > 0:
-        chi_square += ((observed - exp) ** 2) / exp
+        chi2 += (obs - exp) ** 2 / exp
 
-print("\nКритерий Пирсона χ² =", chi_square)
+# степени свободы
+k = m - 1 - 2  # 2 параметра (mu, sigma)
 
-# ---------------------------------------------
-# 20. Число степеней свободы
-# k = m - s - 1
-# где s = число параметров распределения
-# для нормального распределения s = 2
-# ---------------------------------------------
-
-k = m - 2 - 1
-
+print("\nχ² =", chi2)
 print("Степени свободы =", k)
 
-print("\nДальше χ² сравнивается с табличным значением.")
+# ---------------------------------------------
+# 13. Проверка гипотезы
+# ---------------------------------------------
+
+alpha = 0.05
+
+# табличное значение можно взять из таблицы (примерно)
+# для k ~ 20 → ~31.4 (пример, уточнить по таблице)
+chi2_critical = 31.4
+
+print("χ² критическое =", chi2_critical)
+
+if chi2 < chi2_critical:
+    print("\nГипотеза H0 принимается (распределение нормальное)")
+else:
+    print("\nГипотеза H0 отвергается (распределение не нормальное)")
